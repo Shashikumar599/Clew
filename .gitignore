@@ -1,0 +1,22 @@
+# Data (AGPL-3.0, do not redistribute)
+data/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Local infra state
+.minio/
+.dynamodb/
+.env
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+resources
+
+claude.md
