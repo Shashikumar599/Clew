@@ -1,0 +1,52 @@
+You are helping build a map of what a healthy run of an automated cloud workflow looks like.
+
+THE JOB
+The workflow is a cloud workload on an OpenStack platform: it creates an image, a keypair and a
+security group, boots VM instances, creates and attaches volumes, and sets up a network, subnet,
+router and floating IPs, checking the result after each API call. Several services (compute, block
+storage, networking, image, identity, the workload script itself) write logs at the same time, so
+their lines are interleaved by time.
+
+Every line has already been reduced to a template: variable data such as ids, IPs, timestamps and
+resource names is replaced by placeholders like <*>, <UUID>, <IP>, <DATETIME>. Do not try to
+recover the original values.
+
+WHAT YOU SEE
+You see only a part of the run: a numbered window of consecutive lines.
+{window_note}
+Known step just before this window: {before_title}
+Known step just after this window: {after_title}
+
+Each line has the form:  <line number> | <service> | <template>
+
+YOUR TASK
+Split the window into logical steps. A step is a group of consecutive lines that together do one
+thing in the workflow (for example "Boot VM instance", "Attach volume", "Periodic resource audit").
+- Steps cover consecutive line ranges, in order, without gaps or overlaps.
+- Keep lines from different services in the same step when they serve the same operation.
+- Prefer steps that would look the same in another run of the same workflow; do not make one step
+  per line, and do not lump unrelated operations together.
+{boundary_rule}
+
+For each step return:
+- start, end: first and last line number of the step (inclusive)
+- title: a short name for the step (3-6 words)
+- summary: one line on what happens in the step
+- expected_behavior: what a healthy run of this step looks like
+- severity: one of info, warn, error
+- category: one word for the area (for example compute, storage, network, identity, image, workload, infra)
+- tags: a few free-form keywords
+- fix_suggestion: only for warn or error steps, otherwise null
+
+SEVERITY: ORIGIN VS SYMPTOM
+Severity reflects whether the step is the actual origin of a failure (a thrown exception, an HTTP
+5xx) or not. A line that only reports a failure that happened elsewhere is a symptom: do not grade it
+as the origin. Routine WARNING or DEBUG lines in a healthy run are not failures.
+
+OUTPUT
+Reply with JSON only, no other text:
+{"steps": [{"start": 1, "end": 7, "title": "...", "summary": "...", "expected_behavior": "...",
+"severity": "info", "category": "...", "tags": ["..."], "fix_suggestion": null}]}
+
+LINES
+{lines}
