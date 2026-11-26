@@ -21,7 +21,7 @@ class NodeRepo:
         self.nodes[node["chunk_id"]] = node
 
     def children(self, chunk_id):
-        """Point-reads of a node's children (the adjacency list lives on the node, as in the doc)."""
+        """Point-reads of a node's children (the adjacency list lives on the node)."""
         return [self.nodes[c] for c in self.nodes[chunk_id]["child_chunk_ids"]]
 
     def all(self):

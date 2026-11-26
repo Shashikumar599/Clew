@@ -2,7 +2,7 @@
 
 The run's processed lines are sent in windows of WINDOW_LINES. In a non-final window the model ends
 its last step at a clean boundary, and the lines after that step are carried into the next window
-(doc: "non-final window" hint; decision 22). Each window also gets the title of the step just
+(non-final window hint; decision 22). Each window also gets the title of the step just
 before it (decision 21).
 """
 import json
@@ -22,10 +22,11 @@ BOUNDARY_RULE = {
 }
 
 
-def build_prompt(template, lines, final, before_title, after_title):
+def build_prompt(template, lines, final, before_title, after_title, service=None):
     """Fill the prompt placeholders. str.replace, not str.format: the prompt holds literal JSON braces."""
     numbered = "\n".join(f"{i} | {e['service']} | {e['template']}" for i, e in enumerate(lines, 1))
-    return (template.replace("{window_note}", WINDOW_NOTE[final])
+    return (template.replace("{service}", service or "")
+            .replace("{window_note}", WINDOW_NOTE[final])
             .replace("{boundary_rule}", BOUNDARY_RULE[final])
             .replace("{before_title}", before_title or "none")
             .replace("{after_title}", after_title or "none")
@@ -60,10 +61,10 @@ def parse_steps(reply, n_lines, final):
 
 
 def segment_run(entries, llm, prompt_template, window_lines, max_attempts, max_windows=None, log=print,
-                before_title=None, after_title=None):
+                before_title=None, after_title=None, service=None):
     """Split a run (or one unmatched span of it) into steps. Returns (steps, stats).
     Each step = the model's metadata + `lines` (the entries it covers, in order).
-    before_title / after_title: the known steps around a span (doc: Phase 3 context)."""
+    before_title / after_title: the known steps around a span (Phase 3 context)."""
     steps, stats = [], {"windows": 0, "input_tokens": 0, "output_tokens": 0, "retries": 0}
     pos, carry = 0, []  # pos = next unsent entry; carry = lines left after the last step of the previous window
     while carry or pos < len(entries):
@@ -75,7 +76,7 @@ def segment_run(entries, llm, prompt_template, window_lines, max_attempts, max_w
         pos += take
         final = pos >= len(entries)
         before = steps[-1]["title"] if steps else before_title
-        base_prompt = build_prompt(prompt_template, window, final, before, after_title if final else None)
+        base_prompt = build_prompt(prompt_template, window, final, before, after_title if final else None, service)
         prompt = base_prompt
 
         for attempt in range(1, max_attempts + 1):
@@ -87,7 +88,9 @@ def segment_run(entries, llm, prompt_template, window_lines, max_attempts, max_w
                 break
             except ValueError as e:
                 if attempt == max_attempts:
-                    raise RuntimeError(f"window {stats['windows'] + 1}: invalid reply after {attempt} attempts: {e}")
+                    err = RuntimeError(f"window {stats['windows'] + 1}: invalid reply after {attempt} attempts: {e}")
+                    err.stats = stats  # tokens already spent, so the caller can still count them
+                    raise err
                 stats["retries"] += 1
                 log(f"  window {stats['windows'] + 1}: invalid reply ({e}), asking again")
                 prompt += f"\n\nNOTE: a previous answer to this request was rejected: {e}. Follow the rules exactly."

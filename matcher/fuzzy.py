@@ -1,9 +1,8 @@
 """Text scoring shared by Phase 0 (fuzzy tier) and Phase 1.
 
-Doc: "a blend of token-set containment (with placeholders stripped from the template side) and a
-prefix-agreement score over the first six literal tokens". The threshold "decays for very long
-lines, and relaxes the more node lines have already been confirmed matched in the current span".
-Exact formula and numbers are ours (decision 34).
+Score = blend of token-set containment (placeholders stripped from the template side) and a
+prefix-agreement score over the first six literal tokens. The threshold decays for very long
+lines and relaxes once more of the node's lines are confirmed in the current visit (decision 34).
 """
 import re
 
@@ -27,17 +26,36 @@ class Line:
 
 class Template:
     """One line template of a graph node, with what the matchers need precomputed."""
-    __slots__ = ("text", "node_id", "lit_set", "prefix", "regex")
+    __slots__ = ("text", "node_id", "lit_set", "prefix", "pattern")
 
     def __init__(self, text, node_id, prefix_n):
         self.text, self.node_id = text, node_id
-        lit = literal(text.split())
+        tokens = text.split()
+        lit = literal(tokens)
         self.lit_set = set(lit)
         self.prefix = lit[:prefix_n]
         # Phase 0 regex tier: "a regex compiled from the node's placeholder pattern".
-        # Each placeholder becomes a wildcard, so a line that kept a literal value still matches.
-        parts = PLACEHOLDER.split(text)
-        self.regex = re.compile(".+?".join(re.escape(p) for p in parts)) if len(parts) > 1 else None
+        # Matched token by token (a Drain3 <*> stands for one token): per token, None = must be
+        # equal, True = whole-token placeholder (anything), or a small regex for a mixed token
+        # such as req-<UUID>. A whole-line regex with many .+? backtracked for seconds per line.
+        if PLACEHOLDER.search(text):
+            self.pattern = [True if PLACEHOLDER.fullmatch(t) else
+                            re.compile("[^ ]+?".join(re.escape(p) for p in PLACEHOLDER.split(t)))
+                            if PLACEHOLDER.search(t) else None for t in tokens]
+        else:
+            self.pattern = None
+
+    def regex_match(self, line):
+        """Same token count, and every token equal or fitting its placeholder."""
+        if self.pattern is None or len(line.tokens) != len(self.pattern):
+            return False
+        for p, want, got in zip(self.pattern, self.text.split(), line.tokens):
+            if p is None:
+                if want != got:
+                    return False
+            elif p is not True and not p.fullmatch(got):
+                return False
+        return True
 
 
 def score(line, tpl):

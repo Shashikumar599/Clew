@@ -1,0 +1,60 @@
+You are helping find the root cause of a FAILED run of an automated cloud workflow.
+
+THE JOB
+The workflow is a cloud workload on an OpenStack platform: it creates an image, a keypair and a
+security group, boots VM instances, creates and attaches volumes, and sets up a network, subnet,
+router and floating IPs, checking the result after each API call. Several services (compute, block
+storage, networking, image, identity, the workload script itself) write logs at the same time.
+
+THIS RUN FAILED. A map of healthy runs already explains most of its log. The lines below are the
+ones that did NOT match any healthy step: they are where the failure is most likely visible.
+
+THIS STREAM
+All lines below come from ONE service, in time order: {service}
+Lines of other services are not shown.
+
+Every line has already been reduced to a template: variable data such as ids, IPs, timestamps and
+resource names is replaced by placeholders like <*>, <UUID>, <IP>, <DATETIME>. Do not try to
+recover the original values.
+
+WHAT YOU SEE
+A numbered window of consecutive unmatched lines of this service.
+{window_note}
+Known healthy step of this service just before these lines: {before_title}
+Known healthy step of this service just after these lines: {after_title}
+
+Each line has the form:  <line number> | <service> | <template>
+
+YOUR TASK
+Split the window into logical steps of this service. A step is a group of consecutive lines that
+together do one thing (for example "Server list fails with TypeError", "Volume detach on cleanup").
+- Steps cover consecutive line ranges, in order, without gaps or overlaps.
+- Keep one exception and its traceback in one step.
+{boundary_rule}
+
+For each step return:
+- start, end: first and last line number of the step (inclusive)
+- title: a short name for the step (3-6 words)
+- summary: one line on what happens in the step
+- expected_behavior: what a healthy run would do here instead
+- severity: one of info, warn, error (see below)
+- category: one word for the area (for example compute, storage, network, identity, image, workload, infra)
+- tags: a few free-form keywords
+- fix_suggestion: for warn or error steps, the most useful next action for an engineer; otherwise null
+
+SEVERITY: ORIGIN VS SYMPTOM
+- error = the ORIGIN of a failure: the place where it actually happens (a thrown exception with its
+  traceback, an HTTP 5xx raised here, a function returning something invalid).
+- warn  = a SYMPTOM: a line that only reports or reacts to a failure that happened elsewhere
+  (an HTTP 4xx/409 caused by an earlier error, a client reporting an error, cleanup complaints).
+- info  = harmless: routine lines that happen not to be in the healthy map.
+Do not grade a symptom as the origin. In a traceback, name in the summary the deepest function where
+the failure starts.
+
+OUTPUT
+Reply with JSON only, no other text:
+{"steps": [{"start": 1, "end": 7, "title": "...", "summary": "...", "expected_behavior": "...",
+"severity": "error", "category": "...", "tags": ["..."], "fix_suggestion": "..."}]}
+
+LINES
+{lines}

@@ -11,10 +11,12 @@ from botocore.config import Config
 
 class BedrockLLM:
     def __init__(self, model_id, profile, region, max_tokens, temperature):
+        if not model_id:
+            raise SystemExit("No LLM model set: export CLEW_LLM_MODEL=<Bedrock model id>")
         session = boto3.Session(profile_name=os.environ.get("AWS_PROFILE", profile), region_name=region)
         # long read timeout: a full window of steps can take a minute or more to generate
         self.client = session.client("bedrock-runtime", config=Config(
-            read_timeout=300, retries={"max_attempts": 5, "mode": "adaptive"}))
+            read_timeout=300, retries={"max_attempts": 12, "mode": "adaptive"}))  # Bedrock throttles bursts
         self.model_id, self.max_tokens, self.temperature = model_id, max_tokens, temperature
 
     def complete(self, prompt):

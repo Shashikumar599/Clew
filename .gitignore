@@ -17,7 +17,5 @@ venv/
 .idea/
 .vscode/
 
-resources
-
-claude.md
-planner.md
+# Private study notes, source material and context (never published)
+local/

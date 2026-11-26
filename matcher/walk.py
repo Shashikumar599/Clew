@@ -23,9 +23,15 @@ from matcher.fuzzy import Line, Template, score, threshold
 
 
 class GraphIndex:
-    def __init__(self, repo, root_id, cfg):
+    """The nodes one walk may use. In stream mode (decision 38) root_id is the stream's sub-root and
+    only that service's nodes are indexed, so Phase 1 searches the stream's own nodes only."""
+
+    def __init__(self, repo, root_id, cfg, service=None):
         self.cfg, self.root_id = cfg, root_id
-        self.nodes = {n["chunk_id"]: n for n in repo.all()}
+        self.nodes = {n["chunk_id"]: n for n in repo.all()
+                      if service is None or n["chunk_id"] == root_id or
+                      (n.get("service") == service and not n.get("is_service_root"))
+                      if not n.get("superseded_by")}  # split nodes are replaced by their parts (decision 40)
         self.tpls = {}  # node_id -> [Template]
         self.exact = {}  # node_id -> {text: Template}
         self.nodes_with = defaultdict(set)  # template text -> node ids (Phase 1, exact)
@@ -38,7 +44,8 @@ class GraphIndex:
                 self.nodes_with[t.text].add(nid)
                 for tok in t.lit_set:
                     self.by_token[tok].append(t)
-        self.children = {nid: sorted(n["child_chunk_ids"], key=lambda c: -n["child_transition_counts"].get(c, 0))
+        self.children = {nid: sorted((c for c in n["child_chunk_ids"] if c in self.nodes),
+                                     key=lambda c: -n["child_transition_counts"].get(c, 0))
                          for nid, n in self.nodes.items()}
 
     def edge_count(self, a, b):
@@ -58,7 +65,7 @@ class Walker:
         if t:
             return t.text, "exact", 1.0
         for t in idx.tpls[nid]:
-            if t.regex and t.regex.fullmatch(line.text):
+            if t.regex_match(line):
                 return t.text, "regex", 1.0
         th = threshold(line, len(confirmed) * 2 >= len(idx.tpls[nid]), self.cfg)
         best = None
